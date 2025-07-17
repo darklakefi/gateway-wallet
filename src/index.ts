@@ -18,6 +18,7 @@ const config: WalletEmulatorConfig = {
     inputAmount: parseInt(process.env.INPUT_AMOUNT || '1000'),
     minOut: parseInt(process.env.MIN_OUT || '0'),
     network: parseInt(process.env.NETWORK || Network.DEVNET.toString(), 10),
+    trackingId: "id" + Math.random().toString(16).slice(2),
 };
 
 // Load gRPC proto file
@@ -92,7 +93,8 @@ async function executeWalletSwap(): Promise<void> {
             amount_in: config.inputAmount,
             min_out: config.minOut,
             is_swap_x_to_y: true,
-            network: Network.DEVNET // config.network,
+            network: Network.DEVNET, // config.network,
+            tracking_id: config.trackingId,
         };
         
         console.log('Making swap request to gateway...');
