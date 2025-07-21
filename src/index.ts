@@ -2,7 +2,7 @@ import * as dotenv from 'dotenv';
 import { Keypair, Transaction } from '@solana/web3.js';
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
-import { WalletEmulatorConfig, SwapRequest, SwapResponse, SignedTransactionRequest, SignedTransactionResponse, Network, GrpcClient } from './types';
+import { WalletEmulatorConfig, SwapRequest, SwapResponse, SignedTransactionRequest, SignedTransactionResponse, Network, GrpcClient, CheckTransactionStatusRequest, CheckTransactionStatusResponse, TransactionStatus } from './types';
 import * as path from 'path';
 
 // Load environment variables
@@ -58,6 +58,17 @@ function createGrpcClient(): GrpcClient {
         submitSignedTransaction: (request: SignedTransactionRequest): Promise<SignedTransactionResponse> => {
             return new Promise((resolve, reject) => {
                 client.SendSignedTransaction(request, (error: any, response: SignedTransactionResponse) => {
+                    if (error) {
+                        reject(error);
+                    } else {
+                        resolve(response);
+                    }
+                });
+            });
+        },
+        checkTransactionStatus: (request: CheckTransactionStatusRequest): Promise<CheckTransactionStatusResponse> => {
+            return new Promise((resolve, reject) => {
+                client.CheckTransactionStatus(request, (error: any, response: CheckTransactionStatusResponse) => {
                     if (error) {
                         reject(error);
                     } else {
@@ -128,7 +139,8 @@ async function executeWalletSwap(): Promise<void> {
         // Prepare signed transaction request
         const signedTxRequest: SignedTransactionRequest = {
             signed_transaction: signedTransactionBase64,
-            order_id: swapResponse.order_id,
+            transaction_id: swapResponse.transaction_id,
+            tracking_id: config.trackingId,
         };
         // Send the signed transaction to the Solana network
         console.log('Sending signed transaction to Solana network...');
@@ -146,10 +158,57 @@ async function executeWalletSwap(): Promise<void> {
             console.log('❌ Swap failed:', signedTxResponse);
         }
         
+        console.log('Checking transaction status...');
+
+        const checkTxRequest: CheckTransactionStatusRequest = {
+            tracking_id: config.trackingId,
+            transaction_id: swapResponse.transaction_id,
+        };
+        
+        await pollTransactionStatus(grpcClient, checkTxRequest);
+        
+        
     } catch (error) {
         console.error('❌ Error during wallet swap:', error);
         throw error;
     }
+}
+
+async function pollTransactionStatus(
+    grpcClient: GrpcClient,
+    checkTxRequest: CheckTransactionStatusRequest,
+    maxRetries: number = 4,
+    delayMs: number = 500
+): Promise<CheckTransactionStatusResponse | undefined> {
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            console.log(`Attempt ${i + 1}/${maxRetries}: Checking transaction status...`);
+            const checkTxResponse: CheckTransactionStatusResponse = await grpcClient.checkTransactionStatus(checkTxRequest);
+
+            if (checkTxResponse.status === TransactionStatus.SETTLED || checkTxResponse.status === TransactionStatus.SLASHED || checkTxResponse.status === TransactionStatus.CANCELLED) {
+                console.log('Transaction status is final. Returning response.');
+                return checkTxResponse;
+            }
+
+            console.log('Transaction status:', checkTxResponse.status);
+
+        } catch (error) {
+            console.error(`Attempt ${i + 1}/${maxRetries}: Error checking transaction status:`, error);
+            // If it's the last attempt, re-throw the error or return undefined
+            if (i === maxRetries - 1) {
+                console.error("Max retries reached. Could not get a successful response.");
+                return undefined;
+            }
+        }
+
+        // Wait before the next attempt, unless it's the last attempt
+        if (i < maxRetries - 1) {
+            console.log(`Waiting ${delayMs}ms before next attempt...`);
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+    }
+
+    return undefined;
 }
 
 // Main function

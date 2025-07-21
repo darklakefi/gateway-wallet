@@ -4,6 +4,15 @@ export enum Network {
     TESTNET = 1,
 };
 
+export enum TransactionStatus {
+    UNSIGNED  = 0,
+    SIGNED    = 1,
+    CONFIRMED = 2,
+    SETTLED   = 3,
+    SLASHED   = 4,
+    CANCELLED = 5,
+}
+
 export interface WalletEmulatorConfig {
     privateKeyBytes: string;
     gatewayHost: string;
@@ -20,6 +29,7 @@ export interface WalletEmulatorConfig {
 export interface GrpcClient {
     swap: (request: SwapRequest) => Promise<SwapResponse>;
     submitSignedTransaction: (request: SignedTransactionRequest) => Promise<SignedTransactionResponse>;
+    checkTransactionStatus: (request: CheckTransactionStatusRequest) => Promise<CheckTransactionStatusResponse>;
 }
 
 export interface SwapRequest {
@@ -35,14 +45,26 @@ export interface SwapRequest {
 
 export interface SwapResponse {
     unsigned_transaction: string; // Base64 encoded transaction
-    order_id: string;
+    transaction_id: string;
 }
 
 export interface SignedTransactionRequest {
     signed_transaction: string; // Base64 encoded signed transaction
-    order_id: string;  
+    transaction_id: string;  
+    tracking_id: string;
 }
 
 export interface SignedTransactionResponse {
+    transaction_id: string;
     success: boolean;
+}
+
+export interface CheckTransactionStatusRequest {
+    tracking_id: string;
+    transaction_id: string;
+}
+
+export interface CheckTransactionStatusResponse {
+    transaction_id: string;
+    status: TransactionStatus;
 }
