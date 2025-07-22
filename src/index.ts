@@ -2,7 +2,7 @@ import * as dotenv from 'dotenv';
 import { Keypair, Transaction } from '@solana/web3.js';
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
-import { WalletEmulatorConfig, SwapRequest, SwapResponse, SignedTransactionRequest, SignedTransactionResponse, Network, GrpcClient } from './types';
+import { WalletEmulatorConfig, SwapRequest, SwapResponse, SignedTransactionRequest, SignedTransactionResponse, Network, GrpcClient, CheckTradeStatusRequest, CheckTradeStatusResponse, TradeStatus } from './types';
 import * as path from 'path';
 
 // Load environment variables
@@ -58,6 +58,17 @@ function createGrpcClient(): GrpcClient {
         submitSignedTransaction: (request: SignedTransactionRequest): Promise<SignedTransactionResponse> => {
             return new Promise((resolve, reject) => {
                 client.SendSignedTransaction(request, (error: any, response: SignedTransactionResponse) => {
+                    if (error) {
+                        reject(error);
+                    } else {
+                        resolve(response);
+                    }
+                });
+            });
+        },
+        checkTradeStatus: (request: CheckTradeStatusRequest): Promise<CheckTradeStatusResponse> => {
+            return new Promise((resolve, reject) => {
+                client.CheckTradeStatus(request, (error: any, response: CheckTradeStatusResponse) => {
                     if (error) {
                         reject(error);
                     } else {
@@ -128,7 +139,8 @@ async function executeWalletSwap(): Promise<void> {
         // Prepare signed transaction request
         const signedTxRequest: SignedTransactionRequest = {
             signed_transaction: signedTransactionBase64,
-            order_id: swapResponse.order_id,
+            trade_id: swapResponse.trade_id,
+            tracking_id: config.trackingId,
         };
         // Send the signed transaction to the Solana network
         console.log('Sending signed transaction to Solana network...');
@@ -146,10 +158,57 @@ async function executeWalletSwap(): Promise<void> {
             console.log('❌ Swap failed:', signedTxResponse);
         }
         
+        console.log('Checking transaction status...');
+
+        const checkTxRequest: CheckTradeStatusRequest = {
+            tracking_id: config.trackingId,
+            trade_id: swapResponse.trade_id,
+        };
+        
+        await pollTransactionStatus(grpcClient, checkTxRequest);
+        
+        
     } catch (error) {
         console.error('❌ Error during wallet swap:', error);
         throw error;
     }
+}
+
+async function pollTransactionStatus(
+    grpcClient: GrpcClient,
+    checkTxRequest: CheckTradeStatusRequest,
+    maxRetries: number = 4,
+    delayMs: number = 500
+): Promise<CheckTradeStatusResponse | undefined> {
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            console.log(`Attempt ${i + 1}/${maxRetries}: Checking transaction status...`);
+            const checkTxResponse: CheckTradeStatusResponse = await grpcClient.checkTradeStatus(checkTxRequest);
+
+            if (checkTxResponse.status === TradeStatus.SETTLED || checkTxResponse.status === TradeStatus.SLASHED || checkTxResponse.status === TradeStatus.CANCELLED) {
+                console.log('Trade status is final. Returning response.');
+                return checkTxResponse;
+            }
+
+            console.log('Trade status:', checkTxResponse.status);
+
+        } catch (error) {
+            console.error(`Attempt ${i + 1}/${maxRetries}: Error checking trade status:`, error);
+            // If it's the last attempt, re-throw the error or return undefined
+            if (i === maxRetries - 1) {
+                console.error("Max retries reached. Could not get a successful trade response.");
+                return undefined;
+            }
+        }
+
+        // Wait before the next attempt, unless it's the last attempt
+        if (i < maxRetries - 1) {
+            console.log(`Waiting ${delayMs}ms before next attempt...`);
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+    }
+
+    return undefined;
 }
 
 // Main function
