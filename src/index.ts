@@ -2,7 +2,7 @@ import * as dotenv from 'dotenv';
 import { Keypair, Transaction } from '@solana/web3.js';
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
-import { WalletEmulatorConfig, SwapRequest, SwapResponse, SignedTransactionRequest, SignedTransactionResponse, Network, GrpcClient, CheckTransactionStatusRequest, CheckTransactionStatusResponse, TransactionStatus } from './types';
+import { WalletEmulatorConfig, SwapRequest, SwapResponse, SignedTransactionRequest, SignedTransactionResponse, Network, GrpcClient, CheckTradeStatusRequest, CheckTradeStatusResponse, TradeStatus } from './types';
 import * as path from 'path';
 
 // Load environment variables
@@ -66,9 +66,9 @@ function createGrpcClient(): GrpcClient {
                 });
             });
         },
-        checkTransactionStatus: (request: CheckTransactionStatusRequest): Promise<CheckTransactionStatusResponse> => {
+        checkTradeStatus: (request: CheckTradeStatusRequest): Promise<CheckTradeStatusResponse> => {
             return new Promise((resolve, reject) => {
-                client.CheckTransactionStatus(request, (error: any, response: CheckTransactionStatusResponse) => {
+                client.CheckTradeStatus(request, (error: any, response: CheckTradeStatusResponse) => {
                     if (error) {
                         reject(error);
                     } else {
@@ -139,7 +139,7 @@ async function executeWalletSwap(): Promise<void> {
         // Prepare signed transaction request
         const signedTxRequest: SignedTransactionRequest = {
             signed_transaction: signedTransactionBase64,
-            transaction_id: swapResponse.transaction_id,
+            trade_id: swapResponse.trade_id,
             tracking_id: config.trackingId,
         };
         // Send the signed transaction to the Solana network
@@ -160,9 +160,9 @@ async function executeWalletSwap(): Promise<void> {
         
         console.log('Checking transaction status...');
 
-        const checkTxRequest: CheckTransactionStatusRequest = {
+        const checkTxRequest: CheckTradeStatusRequest = {
             tracking_id: config.trackingId,
-            transaction_id: swapResponse.transaction_id,
+            trade_id: swapResponse.trade_id,
         };
         
         await pollTransactionStatus(grpcClient, checkTxRequest);
@@ -176,27 +176,27 @@ async function executeWalletSwap(): Promise<void> {
 
 async function pollTransactionStatus(
     grpcClient: GrpcClient,
-    checkTxRequest: CheckTransactionStatusRequest,
+    checkTxRequest: CheckTradeStatusRequest,
     maxRetries: number = 4,
     delayMs: number = 500
-): Promise<CheckTransactionStatusResponse | undefined> {
+): Promise<CheckTradeStatusResponse | undefined> {
     for (let i = 0; i < maxRetries; i++) {
         try {
             console.log(`Attempt ${i + 1}/${maxRetries}: Checking transaction status...`);
-            const checkTxResponse: CheckTransactionStatusResponse = await grpcClient.checkTransactionStatus(checkTxRequest);
+            const checkTxResponse: CheckTradeStatusResponse = await grpcClient.checkTradeStatus(checkTxRequest);
 
-            if (checkTxResponse.status === TransactionStatus.SETTLED || checkTxResponse.status === TransactionStatus.SLASHED || checkTxResponse.status === TransactionStatus.CANCELLED) {
-                console.log('Transaction status is final. Returning response.');
+            if (checkTxResponse.status === TradeStatus.SETTLED || checkTxResponse.status === TradeStatus.SLASHED || checkTxResponse.status === TradeStatus.CANCELLED) {
+                console.log('Trade status is final. Returning response.');
                 return checkTxResponse;
             }
 
-            console.log('Transaction status:', checkTxResponse.status);
+            console.log('Trade status:', checkTxResponse.status);
 
         } catch (error) {
-            console.error(`Attempt ${i + 1}/${maxRetries}: Error checking transaction status:`, error);
+            console.error(`Attempt ${i + 1}/${maxRetries}: Error checking trade status:`, error);
             // If it's the last attempt, re-throw the error or return undefined
             if (i === maxRetries - 1) {
-                console.error("Max retries reached. Could not get a successful response.");
+                console.error("Max retries reached. Could not get a successful trade response.");
                 return undefined;
             }
         }

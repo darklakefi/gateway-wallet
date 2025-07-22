@@ -10,7 +10,7 @@ enum Network {
     DEVNET       = 2;
 }
 
-enum TransactionStatus {
+enum TradeStatus {
     UNSIGNED  = 0;
     SIGNED    = 1;
     CONFIRMED = 2;
@@ -35,30 +35,30 @@ message CreateUnsignedTransactionResponse {
     // Base64 encoded transaction
     string unsigned_transaction = 1;
     string order_id             = 2;
-    string transaction_id       = 3;
+    string trade_id             = 3;
     // TODO: DAR-488 discuss necessary return values
 }
 
 message SendSignedTransactionRequest {
     string signed_transaction = 1;
     string tracking_id        = 2;
-    string transaction_id     = 3;
+    string trade_id           = 3;
 }
 
 message SendSignedTransactionResponse {
-    bool success          = 1;
-    string transaction_id = 2;
+    bool success    = 1;
+    string trade_id = 2;
     // TODO: DAR-488 discuss necessary return values
 }
 
-message CheckTransactionStatusRequest {
-    string tracking_id    = 1;
-    string transaction_id = 2;
+message CheckTradeStatusRequest {
+    string tracking_id = 1;
+    string trade_id    = 2;
 }
 
-message CheckTransactionStatusResponse {
-    string transaction_id    = 1;
-    TransactionStatus status = 2;
+message CheckTradeStatusResponse {
+    string trade_id    = 1;
+    TradeStatus status = 2;
 }
 
 // --------------------------------- SERVICES
@@ -70,6 +70,6 @@ service SolanaGatewayService {
     rpc SendSignedTransaction(SendSignedTransactionRequest)
         returns (SendSignedTransactionResponse);
 
-    rpc CheckTransactionStatus(CheckTransactionStatusRequest)
-        returns (CheckTransactionStatusResponse);
+    rpc CheckTradeStatus(CheckTradeStatusRequest)
+        returns (CheckTradeStatusResponse);
 }
