@@ -165,7 +165,7 @@ async function executeWalletSwap(): Promise<void> {
             trade_id: swapResponse.trade_id,
         };
         
-        await pollTransactionStatus(grpcClient, checkTxRequest);
+        await pollTransactionStatus(grpcClient, checkTxRequest, 10, 1000);
         
         
     } catch (error) {

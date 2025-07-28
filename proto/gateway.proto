@@ -46,9 +46,9 @@ message SendSignedTransactionRequest {
 }
 
 message SendSignedTransactionResponse {
-    bool success    = 1;
-    string trade_id = 2;
-    // TODO: DAR-488 discuss necessary return values
+    bool success               = 1;
+    string trade_id            = 2;
+    repeated string error_logs = 3;
 }
 
 message CheckTradeStatusRequest {
