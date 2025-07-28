@@ -2,7 +2,7 @@ import * as dotenv from 'dotenv';
 import { Keypair, Transaction } from '@solana/web3.js';
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
-import { WalletEmulatorConfig, SwapRequest, SwapResponse, SignedTransactionRequest, SignedTransactionResponse, Network, GrpcClient, CheckTradeStatusRequest, CheckTradeStatusResponse, TradeStatus } from './types';
+import { WalletEmulatorConfig, SwapRequest, SwapResponse, SignedTransactionRequest, SignedTransactionResponse, Network, GrpcClient, CheckTradeStatusRequest, CheckTradeStatusResponse, TradeStatus, GetTradesListByUserRequest, GetTradesListByUserResponse } from './types';
 import * as path from 'path';
 
 // Load environment variables
@@ -69,6 +69,17 @@ function createGrpcClient(): GrpcClient {
         checkTradeStatus: (request: CheckTradeStatusRequest): Promise<CheckTradeStatusResponse> => {
             return new Promise((resolve, reject) => {
                 client.CheckTradeStatus(request, (error: any, response: CheckTradeStatusResponse) => {
+                    if (error) {
+                        reject(error);
+                    } else {
+                        resolve(response);
+                    }
+                });
+            });
+        },
+        getTradesListByUser: (request: GetTradesListByUserRequest): Promise<GetTradesListByUserResponse> => {
+            return new Promise((resolve, reject) => {
+                client.GetTradesListByUser(request, (error: any, response: GetTradesListByUserResponse) => {
                     if (error) {
                         reject(error);
                     } else {
@@ -165,8 +176,17 @@ async function executeWalletSwap(): Promise<void> {
             trade_id: swapResponse.trade_id,
         };
         
-        await pollTransactionStatus(grpcClient, checkTxRequest, 10, 1000);
+        await pollTransactionStatus(grpcClient, checkTxRequest, 5, 1000);
+
+        const getTradesRequest: GetTradesListByUserRequest = {
+            user_address: walletPublicKey,
+            page_size: 10,
+            page_number: 1,
+        };
         
+        const getTradesResponse: GetTradesListByUserResponse = await grpcClient.getTradesListByUser(getTradesRequest);
+        
+        console.log('Trades list:', getTradesResponse);
         
     } catch (error) {
         console.error('❌ Error during wallet swap:', error);
