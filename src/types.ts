@@ -57,6 +57,7 @@ export interface SignedTransactionRequest {
 export interface SignedTransactionResponse {
     trade_id: string;
     success: boolean;
+    error_logs: string[];
 }
 
 export interface CheckTradeStatusRequest {
