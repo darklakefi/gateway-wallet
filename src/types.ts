@@ -13,23 +13,26 @@ export enum TradeStatus {
     CANCELLED = 5,
 }
 
+export interface TokenMetadata {
+    name: string;
+    symbol: string;
+    decimals: number;
+    logo_uri: string;
+    address: string;
+}
+
 export interface Trade {
     trade_id: string;
     order_id: string;
     user_address: string;
-    token_mint_x: string;
-    token_mint_y: string;
+    token_x: TokenMetadata;
+    token_y: TokenMetadata;
     amount_in: number;
     minimal_amount_out: number;
     status: TradeStatus;
     signature: string;
     created_at: number;
     updated_at: number;
-    token_mint_x_symbol: string;
-    token_mint_y_symbol: string;
-    token_mint_x_decimal: number;
-    token_mint_y_decimal: number;
-
 }
 
 export interface WalletEmulatorConfig {
