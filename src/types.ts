@@ -25,6 +25,11 @@ export interface Trade {
     signature: string;
     created_at: number;
     updated_at: number;
+    token_mint_x_symbol: string;
+    token_mint_y_symbol: string;
+    token_mint_x_decimal: number;
+    token_mint_y_decimal: number;
+
 }
 
 export interface WalletEmulatorConfig {

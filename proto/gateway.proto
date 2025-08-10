@@ -23,17 +23,21 @@ enum TradeStatus {
 // --------------------------------- MESSAGES
 
 message Trade {
-    string trade_id          = 1;
-    string order_id          = 2;
-    string user_address      = 3;
-    string token_mint_x      = 4;
-    string token_mint_y      = 5;
-    int64 amount_in          = 6;
-    int64 minimal_amount_out = 7;
-    TradeStatus status       = 8;
-    string signature         = 9;
-    int64 created_at         = 10;
-    int64 updated_at         = 11;
+    string trade_id            = 1;
+    string order_id            = 2;
+    string user_address        = 3;
+    string token_mint_x        = 4;
+    string token_mint_y        = 5;
+    int64 amount_in            = 6;
+    int64 minimal_amount_out   = 7;
+    TradeStatus status         = 8;
+    string signature           = 9;
+    int64 created_at           = 10;
+    int64 updated_at           = 11;
+    string token_mint_x_symbol = 12;
+    string token_mint_y_symbol = 13;
+    int32 token_mint_x_decimal = 14;
+    int32 token_mint_y_decimal = 15;
 }
 
 message CreateUnsignedTransactionRequest {
