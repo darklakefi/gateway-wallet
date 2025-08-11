@@ -186,7 +186,8 @@ async function executeWalletSwap(): Promise<void> {
         
         const getTradesResponse: GetTradesListByUserResponse = await grpcClient.getTradesListByUser(getTradesRequest);
         
-        console.log('Trades list:', getTradesResponse);
+        console.log('Trades list:');
+        console.dir(getTradesResponse, { depth: null });
         
     } catch (error) {
         console.error('❌ Error during wallet swap:', error);
