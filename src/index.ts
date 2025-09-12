@@ -19,10 +19,12 @@ const config: WalletEmulatorConfig = {
     minOut: parseInt(process.env.MIN_OUT || '0'),
     network: parseInt(process.env.NETWORK || Network.DEVNET.toString(), 10),
     trackingId: "id" + Math.random().toString(16).slice(2),
+    refCode: process.env.REF_CODE || '',
+    label: process.env.LABEL || '',
 };
 
 // Load gRPC proto file
-const PROTO_PATH = path.resolve(__dirname, '../proto/gateway.proto');
+const PROTO_PATH = path.resolve(__dirname, '../proto/darklake/v1/api.proto');
 
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
     keepCase: true,
@@ -36,9 +38,9 @@ const gatewayProto = grpc.loadPackageDefinition(packageDefinition) as any;
 
 // Create gRPC client
 function createGrpcClient(): GrpcClient {
-    const { gateway_solana } = gatewayProto;
+    const { v1 } = gatewayProto.darklake;
 
-    const client = new gateway_solana.SolanaGatewayService(
+    const client = new v1.SolanaGatewayService(
         `${config.gatewayHost}:${config.gatewayPort}`,
         grpc.credentials.createInsecure()
     );
@@ -117,6 +119,8 @@ async function executeWalletSwap(): Promise<void> {
             is_swap_x_to_y: true,
             network: Network.DEVNET, // config.network,
             tracking_id: config.trackingId,
+            ref_code: config.refCode,
+            label: config.label,
         };
         
         console.log('Making swap request to gateway...');
@@ -242,7 +246,9 @@ async function main() {
         tokenY: config.tokenY,
         inputAmount: config.inputAmount,
         minOut: config.minOut,
-        network: config.network
+        network: config.network,
+        refCode: config.refCode,
+        label: config.label,
     });
     
     try {
