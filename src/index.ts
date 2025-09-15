@@ -1,5 +1,5 @@
 import * as dotenv from 'dotenv';
-import { Keypair, Transaction } from '@solana/web3.js';
+import { Keypair, VersionedTransaction, VersionedMessage } from '@solana/web3.js';
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import { WalletEmulatorConfig, SwapRequest, SwapResponse, SignedTransactionRequest, SignedTransactionResponse, Network, GrpcClient, CheckTradeStatusRequest, CheckTradeStatusResponse, TradeStatus, GetTradesListByUserRequest, GetTradesListByUserResponse } from './types';
@@ -135,19 +135,176 @@ async function executeWalletSwap(): Promise<void> {
         // EXPECTS: { unsignedTransaction: string }; // Base64 encoded transaction
         const unsignedTransactionBuffer = Buffer.from(swapResponse.unsigned_transaction, 'base64');
         
+        console.log('Transaction buffer length:', unsignedTransactionBuffer.length);
+        
         console.log('Signing transaction...');
         
+        // Try different approaches to deserialize the transaction
+        let versionedTransaction: VersionedTransaction;
         
-        // Parse the JSON string from the buffer
-        const transactionJson = unsignedTransactionBuffer;
-
-        // Create transaction from the parsed JSON object
-        const transaction = Transaction.from(transactionJson);
-        transaction.sign(keypair);
-
+        try {
+            // First try: Direct VersionedTransaction deserialization
+            console.log('Trying direct VersionedTransaction.deserialize...');
+            versionedTransaction = VersionedTransaction.deserialize(unsignedTransactionBuffer);
+            console.log('Successfully deserialized as VersionedTransaction directly');
+        } catch (error1) {
+            console.log('Direct VersionedTransaction failed:', error1 instanceof Error ? error1.message : String(error1));
+            
+            try {
+                // Second try: VersionedMessage deserialization
+                console.log('Trying VersionedMessage.deserialize...');
+        const versionedMessage = VersionedMessage.deserialize(unsignedTransactionBuffer);
+                console.log('Successfully deserialized as VersionedMessage');
+                
+                // Create a VersionedTransaction with the deserialized message and empty signatures
+                const signatures = new Array(versionedMessage.header.numRequiredSignatures).fill(null);
+                versionedTransaction = new VersionedTransaction(versionedMessage, signatures);
+                console.log('Created VersionedTransaction from VersionedMessage with empty signatures');
+            } catch (error2) {
+                console.log('VersionedMessage deserialization failed:', error2 instanceof Error ? error2.message : String(error2));
+                
+                try {
+                    // Third try: Legacy Transaction
+                    console.log('Trying legacy Transaction.from...');
+                    const { Transaction } = await import('@solana/web3.js');
+                    const legacyTransaction = Transaction.from(unsignedTransactionBuffer);
+                    console.log('Successfully deserialized as legacy Transaction');
+                    
+                    // Sign the legacy transaction
+                    legacyTransaction.sign(keypair);
+                    
+                    // Serialize the signed transaction
+                    const signedTransactionBase64 = legacyTransaction.serialize().toString('base64');
+                    
+                    console.log('Transaction signed successfully');
+                    
+                    // Prepare signed transaction request
+                    const signedTxRequest: SignedTransactionRequest = {
+                        signed_transaction: signedTransactionBase64,
+                        trade_id: swapResponse.trade_id,
+                        tracking_id: config.trackingId,
+                    };
+                    
+                    // Send the signed transaction to the Solana network
+                    console.log('Sending signed transaction to Solana network...');
+                    console.log('Submitting signed transaction to gateway...');
+                    
+                    // Submit signed transaction
+                    const signedTxResponse: SignedTransactionResponse = await grpcClient.submitSignedTransaction(signedTxRequest);
+                    
+                    if (signedTxResponse.success) {
+                        console.log('✅ Swap completed successfully!');
+                    } else {
+                        console.log('❌ Swap failed:', signedTxResponse);
+                    }
+                    
+                    console.log('Checking transaction status...');
+                    const checkTxRequest: CheckTradeStatusRequest = {
+                        tracking_id: config.trackingId,
+                        trade_id: swapResponse.trade_id,
+                    };
+                    
+                    await pollTransactionStatus(grpcClient, checkTxRequest, 5, 1000);
+                    return;
+                } catch (error3) {
+                    console.log('Legacy Transaction deserialization failed:', error3 instanceof Error ? error3.message : String(error3));
+                    
+                    // Fourth try: Manual parsing approach
+                    try {
+                        console.log('Trying manual parsing approach...');
+                        
+                        // The gateway is sending us just the message part, not a complete transaction
+                        // We need to manually parse the message and create a proper VersionedTransaction
+                        
+                        console.log('Gateway sent message-only transaction, trying to construct VersionedTransaction...');
+                        
+                        // Let's try to manually construct a VersionedTransaction
+                        // The structure should be: [signatures][message]
+                        // But we're getting just the message part
+                        
+                        // The issue might be that we're not correctly parsing the versioned message
+                        // Let's try to parse the message directly first
+                        try {
+                            console.log('Trying to parse the message directly...');
+                            
+                            // The buffer we received might be just the message part
+                            // Let's try to parse it as a VersionedMessage first
+                            const message = VersionedMessage.deserialize(unsignedTransactionBuffer);
+                            console.log('Successfully parsed as VersionedMessage');
+                            console.log('Message header:', message.header);
+                            console.log('Message account keys count:', message.staticAccountKeys.length);
+                            console.log('Message type:', message.constructor.name);
+                            
+                            // Now create a VersionedTransaction with this message
+                            const signatures = new Array(message.header.numRequiredSignatures).fill(null);
+                            versionedTransaction = new VersionedTransaction(message, signatures);
+                            console.log('Successfully created VersionedTransaction from parsed message');
+                            
+                        } catch (parseError) {
+                            console.log('Direct message parsing failed:', parseError instanceof Error ? parseError.message : String(parseError));
+                            
+                            // Let's try the original approach with empty signatures
+                            console.log('Trying with empty signatures approach...');
+                            
+                            // Create a buffer that includes empty signatures
+                            const numSignatures = 1; // We expect 1 signature
+                            const signatureLength = 64; // Each signature is 64 bytes
+                            const totalSignatureLength = numSignatures * signatureLength;
+                            
+                            // Create a new buffer: [empty_signatures][message]
+                            const fullTransactionBuffer = Buffer.alloc(totalSignatureLength + unsignedTransactionBuffer.length);
+                            
+                            // Fill with empty signatures first
+                            fullTransactionBuffer.fill(0, 0, totalSignatureLength);
+                            
+                            // Then add the message
+                            unsignedTransactionBuffer.copy(fullTransactionBuffer, totalSignatureLength);
+                            
+                            console.log('Created full transaction buffer with empty signatures');
+                            
+                            // Try to deserialize this
+                            versionedTransaction = VersionedTransaction.deserialize(fullTransactionBuffer);
+                            console.log('Successfully deserialized manually constructed VersionedTransaction');
+                        }
+                        
+                    } catch (error4) {
+                        console.log('Manual parsing failed:', error4 instanceof Error ? error4.message : String(error4));
+                        
+                        // Final attempt: Let's try to understand what the gateway actually sent us
+                        console.log('Analyzing transaction structure...');
+                        console.log('Transaction appears to be a versioned message without signatures');
+                        console.log('This suggests the gateway is sending us an unsigned message that needs to be wrapped in a transaction');
+                        
+                        // Maybe we need to create a new transaction from scratch using the message
+                        // But first, let's see if we can extract any useful information
+                        
+                        throw new Error('Unable to deserialize transaction - gateway may be sending unsupported format');
+                    }
+                }
+            }
+        }
+        
+        // Check if our wallet is in the required signers
+        const walletPubKey = keypair.publicKey;
+        const requiredSigners = versionedTransaction.message.staticAccountKeys.slice(0, versionedTransaction.message.header.numRequiredSignatures);
+        const isWalletRequiredSigner = requiredSigners.some(key => key.equals(walletPubKey));
+        
+        if (!isWalletRequiredSigner) {
+            // If the transaction has no required signatures, we might not need to sign it
+            if (versionedTransaction.message.header.numRequiredSignatures === 0) {
+                console.log('Transaction has no required signatures, proceeding without signing...');
+            } else {
+                console.log('Transaction requires signatures but wallet is not a signer');
+                throw new Error('Cannot sign transaction - wallet is not a required signer');
+            }
+        } else {
+            // Sign the versioned transaction
+            console.log('Signing transaction with wallet keypair...');
+            versionedTransaction.sign([keypair]);
+        }
         
         // Serialize the signed transaction
-        const signedTransactionBase64 = transaction.serialize().toString('base64');
+        const signedTransactionBase64 = Buffer.from(versionedTransaction.serialize()).toString('base64');
         
         console.log('Transaction signed successfully');
         
@@ -157,10 +314,9 @@ async function executeWalletSwap(): Promise<void> {
             trade_id: swapResponse.trade_id,
             tracking_id: config.trackingId,
         };
+        
         // Send the signed transaction to the Solana network
         console.log('Sending signed transaction to Solana network...');
-
-
         console.log('Submitting signed transaction to gateway...');
         
         // Submit signed transaction
