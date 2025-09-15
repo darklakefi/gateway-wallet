@@ -47,6 +47,8 @@ export interface WalletEmulatorConfig {
     minOut: number;
     network: Network;
     trackingId: string;
+    refCode: string;
+    label: string;
 }
 
 // gRPC client types
@@ -66,6 +68,8 @@ export interface SwapRequest {
     is_swap_x_to_y: boolean;
     network: Network;
     tracking_id: string;
+    ref_code: string;
+    label: string;
 }
 
 export interface SwapResponse {
