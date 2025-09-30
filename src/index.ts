@@ -1,5 +1,5 @@
 import * as dotenv from 'dotenv';
-import { Keypair, Transaction } from '@solana/web3.js';
+import { Keypair, VersionedMessage, VersionedTransaction } from '@solana/web3.js';
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import { WalletEmulatorConfig, SwapRequest, SwapResponse, SignedTransactionRequest, SignedTransactionResponse, Network, GrpcClient, CheckTradeStatusRequest, CheckTradeStatusResponse, TradeStatus, GetTradesListByUserRequest, GetTradesListByUserResponse } from './types';
@@ -134,20 +134,24 @@ async function executeWalletSwap(): Promise<void> {
         // Decode and load the unsigned transaction
         // EXPECTS: { unsignedTransaction: string }; // Base64 encoded transaction
         const unsignedTransactionBuffer = Buffer.from(swapResponse.unsigned_transaction, 'base64');
-        
-        console.log('Signing transaction...');
-        
-        
-        // Parse the JSON string from the buffer
-        const transactionJson = unsignedTransactionBuffer;
+
+        const message = unsignedTransactionBuffer.slice(1);
 
         // Create transaction from the parsed JSON object
-        const transaction = Transaction.from(transactionJson);
-        transaction.sign(keypair);
+        const versionedMessage = VersionedMessage.deserialize(message);
+        console.log('Signing transaction...');
 
+        // Create placeholder signatures array with the correct length
+        const numRequiredSignatures = versionedMessage.header.numRequiredSignatures;
+        const placeholderSignatures = Array.from({ length: numRequiredSignatures }, () => new Uint8Array(64)); // 64 bytes per signature
+        
+        const versionedTx = new VersionedTransaction(versionedMessage, placeholderSignatures);
+
+        versionedTx.sign([keypair]);
         
         // Serialize the signed transaction
-        const signedTransactionBase64 = transaction.serialize().toString('base64');
+        const serializedTx = versionedTx.serialize();
+        const signedTransactionBase64 = Buffer.from(serializedTx).toString('base64');
         
         console.log('Transaction signed successfully');
         
