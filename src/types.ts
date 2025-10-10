@@ -49,6 +49,9 @@ export interface WalletEmulatorConfig {
     trackingId: string;
     refCode: string;
     label: string;
+    amountLp: number;
+    maxAmountX: number;
+    maxAmountY: number;
 }
 
 // gRPC client types
@@ -57,6 +60,8 @@ export interface GrpcClient {
     submitSignedTransaction: (request: SignedTransactionRequest) => Promise<SignedTransactionResponse>;
     checkTradeStatus: (request: CheckTradeStatusRequest) => Promise<CheckTradeStatusResponse>;
     getTradesListByUser: (request: GetTradesListByUserRequest) => Promise<GetTradesListByUserResponse>;
+    quoteAddLiquidity: (request: QuoteAddLiquidityRequest) => Promise<QuoteAddLiquidityResponse>;
+    addLiquidity: (request: AddLiquidityRequest) => Promise<AddLiquidityResponse>;
 }
 
 export interface SwapRequest {
@@ -109,4 +114,33 @@ export interface GetTradesListByUserResponse {
     trades: Trade[];
     total_pages: number;
     current_page: number;
+}
+
+export interface QuoteAddLiquidityRequest {
+    token_mint_x: string;
+    token_mint_y: string;
+    token_x_amount: number;
+    token_y_amount: number;
+    slippage_tolerance: number;
+}
+
+export interface QuoteAddLiquidityResponse {
+    lp_token_amount: number;
+    lp_token_decimals: number;
+    lp_token_amount_display: number;
+}
+
+export interface AddLiquidityRequest {
+    token_mint_x: string;
+    token_mint_y: string;
+    user_address: string;
+    amount_lp: number;
+    max_amount_x: number;
+    max_amount_y: number;
+    ref_code: string;
+    label: string;
+}
+
+export interface AddLiquidityResponse {
+    unsigned_transaction: string; // Base64 encoded transaction
 }

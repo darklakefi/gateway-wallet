@@ -1,16 +1,17 @@
-# Darklake Wallet Emulator
+# Darklake Gateway Wallet
 
-A simple TypeScript wallet emulator that executes a single swap operation on the Darklake DEX through a gRPC gateway API.
+A TypeScript wallet emulator that provides multiple operations on the Darklake DEX through a gRPC gateway API, including swap, add liquidity, and quote operations.
 
 ## Features
 
-- Load wallet from private key bytes
-- Make gRPC request to gateway for unsigned transaction
-- Sign transaction with loaded wallet
-- Submit signed transaction to gateway via gRPC
-- Single execution with automatic exit
-- Support for devnet and mainnet networks
-- Modern gRPC-js implementation
+- **Swap Operations**: Execute token swaps through the gateway
+- **Add Liquidity**: Add liquidity to pools and receive LP tokens
+- **Quote Operations**: Get quotes for add liquidity operations
+- **Wallet Management**: Load wallet from private key bytes
+- **Transaction Handling**: Sign and broadcast transactions to Solana
+- **gRPC Integration**: Modern gRPC-js implementation
+- **Multiple Networks**: Support for devnet, testnet, and mainnet
+- **Modular Architecture**: Clean separation of concerns with shared utilities
 
 ## Prerequisites
 
@@ -60,18 +61,32 @@ solana-keygen new --outfile key.json
 
 ## Usage
 
-### Development Mode
+### Available Scripts
+
+#### Swap Operations
 ```bash
+# Execute a token swap
+pnpm run swap
+```
+
+#### Add Liquidity Operations
+```bash
+# Add liquidity to a pool
+pnpm run add-liquidity
+
+# Get a quote for adding liquidity
+pnpm run quote-liquidity
+```
+
+#### Development & Build
+```bash
+# Development mode (runs index.ts)
 pnpm run dev
-```
 
-### Production Mode
-```bash
+# Production mode
 pnpm start
-```
 
-### Build Only
-```bash
+# Build only
 pnpm run build
 ```
 
@@ -152,13 +167,16 @@ message SendSignedTransactionResponse {
 ```
 gateway-wallet/
 ├── src/
-│   ├── index.ts          # Main entry point
-│   └── types.ts          # TypeScript type definitions
+│   ├── index.ts              # Main entry point with executeMain function
+│   ├── swap.ts               # Swap operations
+│   ├── add-liquidity.ts      # Add liquidity operations
+│   ├── quote-add-liquidity.ts # Quote operations
+│   ├── utils.ts              # Shared utility functions
+│   └── types.ts              # TypeScript type definitions
 ├── proto/
-│   ├── gateway.proto     # gRPC service definition
-│   └── buf/
-│       └── validate/
-│           └── validate.proto
+│   └── darklake/
+│       └── v1/
+│           └── api.proto     # gRPC service definition
 ├── package.json
 ├── tsconfig.json
 └── README.md
