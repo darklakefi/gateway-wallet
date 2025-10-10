@@ -7,6 +7,9 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
+    "swap": "ts-node src/swap.ts",
+    "quote-liquidity": "ts-node src/quote-add-liquidity.ts",
+    "add-liquidity": "ts-node src/add-liquidity.ts",
     "watch": "tsc --watch",
     "test-setup": "node test-setup.js"
   },
